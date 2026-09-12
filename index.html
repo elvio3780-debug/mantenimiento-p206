@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="description" content="Aplicación de mantenimiento para Peugeot 206">
+    <title>P206 Mantenimiento</title>
+    
+    <!-- PWA Manifest & Mobile App Settings -->
+    <link rel="manifest" href="./manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="P206">
+    <link rel="apple-touch-icon" href="./Iconos/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="./Iconos/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="./Iconos/icon-512.png">
+    <link rel="icon" type="image/x-icon" href="./Iconos/206.ico">
+    
+    <!-- Fonts and Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+    <!-- Splash Screen -->
+    <div id="splashScreen" class="splash-screen">
+        <img src="./Iconos/Leon.png" alt="Peugeot Leon" class="splash-image">
+    </div>
+    
+    <div class="app-container">
+        <!-- Header -->
+        <header class="top-bar">
+            <div class="logo-area">
+                <img src="./Iconos/206.ico" alt="P206 Logo" class="app-logo">
+                <div>
+                    <h1>Peugeot 206</h1>
+                    <p class="subtitle">1.4 Nafta 75cv - 2012</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button type="button" id="btnInstallPwa" class="icon-btn hidden" title="Instalar App" aria-label="Instalar App"><i class="ph ph-download-simple"></i></button>
+                <button type="button" id="btnSettings" class="icon-btn" title="Configuración" aria-label="Configuración"><i class="ph ph-gear"></i></button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main id="main-content">
+            <!-- Overview Card -->
+            <section class="card glass-card mileage-card">
+                <div class="card-header">
+                    <h2>Kilometraje Actual</h2>
+                    <button type="button" id="btnEditMileage" class="icon-btn small" title="Modificar kilometraje" aria-label="Modificar kilometraje"><i class="ph ph-pencil-simple"></i></button>
+                </div>
+                <div class="mileage-display">
+                    <span id="currentMileage">0</span> <span class="unit">km</span>
+                </div>
+            </section>
+
+            <!-- Quick Actions -->
+            <section class="quick-actions">
+                <div class="action-card" id="btnInflateTires">
+                    <div class="action-icon"><i class="ph ph-tire"></i></div>
+                    <div class="action-info">
+                        <h3>Neumáticos</h3>
+                        <p id="tireStatus">Sin registro</p>
+                    </div>
+                </div>
+                <div class="action-card" id="btnAddMaintenance">
+                    <div class="action-icon"><i class="ph ph-wrench"></i></div>
+                    <div class="action-info">
+                        <h3>Nuevo Registro</h3>
+                        <p>Agregar servicio</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Next Due Alerts -->
+            <section class="alerts-section">
+                <h2>Próximos Servicios</h2>
+                <div id="alertsList" class="alerts-list">
+                    <!-- Alerts will be injected here -->
+                </div>
+            </section>
+
+            <!-- Maintenance History -->
+            <section class="history-section">
+                <div class="section-header">
+                    <div>
+                        <h2>Historial</h2>
+                        <p class="swipe-hint">Desliza: ← Modificar | Borrar →</p>
+                    </div>
+                    <button type="button" id="btnViewAll" class="text-btn">Ver todos</button>
+                </div>
+                <div id="historyList" class="history-list">
+                    <!-- History items will be injected here -->
+                </div>
+            </section>
+        </main>
+
+        <!-- Modals -->
+        
+        <!-- Update Mileage Modal -->
+        <div id="modalMileage" class="modal-overlay hidden">
+            <div class="modal-content glass-card">
+                <div class="modal-header">
+                    <h2>Actualizar Kilometraje</h2>
+                    <button type="button" class="close-modal icon-btn" title="Cerrar" aria-label="Cerrar"><i class="ph ph-x"></i></button>
+                </div>
+                <form id="formMileage">
+                    <div class="input-group">
+                        <label for="inputMileage">Kilómetros</label>
+                        <input type="number" id="inputMileage" required min="0">
+                    </div>
+                    <button type="submit" class="btn-primary">Guardar</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Add / Edit Maintenance Modal -->
+        <div id="modalMaintenance" class="modal-overlay hidden">
+            <div class="modal-content glass-card">
+                <div class="modal-header">
+                    <h2 id="modalMaintenanceTitle">Registrar Servicio</h2>
+                    <button type="button" class="close-modal icon-btn" title="Cerrar" aria-label="Cerrar"><i class="ph ph-x"></i></button>
+                </div>
+                <form id="formMaintenance">
+                    <input type="hidden" id="editMaintenanceId" value="">
+                    <div class="input-group">
+                        <label for="inputType">Tipo de Servicio</label>
+                        <select id="inputType" required>
+                            <option value="aceite">Cambio de Aceite y Filtros</option>
+                            <option value="distribucion">Correa de Distribución</option>
+                            <option value="frenos">Frenos</option>
+                            <option value="bateria">Batería</option>
+                            <option value="neumaticos">Cambio de Neumáticos</option>
+                            <option value="otro">Otro</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="inputDate">Fecha</label>
+                        <input type="date" id="inputDate" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="inputKm">Kilometraje</label>
+                        <input type="number" id="inputKm" required min="0">
+                    </div>
+                    <div class="input-group">
+                        <label for="inputNotes">Notas</label>
+                        <textarea id="inputNotes" rows="2" placeholder="Ej. Filtro marca X, aceite Y..."></textarea>
+                    </div>
+                    <button type="submit" id="btnSubmitMaintenance" class="btn-primary">Guardar Registro</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Confirm Delete Modal -->
+        <div id="modalConfirmDelete" class="modal-overlay hidden">
+            <div class="modal-content glass-card confirm-modal">
+                <div class="confirm-icon">
+                    <i class="ph ph-trash"></i>
+                </div>
+                <h2>¿Eliminar Registro?</h2>
+                <p id="deleteItemDescription">¿Estás seguro de que deseas eliminar este servicio del historial?</p>
+                <div class="modal-actions">
+                    <button type="button" id="btnCancelDelete" class="btn-secondary">Cancelar</button>
+                    <button type="button" id="btnConfirmDelete" class="btn-danger">Eliminar</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Alert Notification -->
+        <div id="toastNotification" class="toast hidden">
+            <i class="ph ph-info"></i>
+            <span id="toastMessage">Mensaje</span>
+        </div>
+    </div>
+    
+    <script>
+      // Register service worker for PWA
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js').then(reg => {
+            reg.update();
+          });
+        });
+      }
+    </script>
+    <script src="./app.js"></script>
+</body>
+</html>
