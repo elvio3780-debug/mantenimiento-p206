@@ -81,33 +81,25 @@ function parseLocalDate(dateStr) {
     return new Date(dateStr);
 }
 
-let deferredPrompt;
-
-window.addEventListener('beforeinstallprompt', (e) => {
-    // Prevent the mini-infobar from appearing on mobile
-    e.preventDefault();
-    // Stash the event so it can be triggered later.
-    deferredPrompt = e;
-    // Update UI notify the user they can install the PWA
-    if (els.btnInstallPwa) {
-        els.btnInstallPwa.classList.remove('hidden');
-    }
-});
 
 // Initialize
 function init() {
-    loadState();
-    setupEventListeners();
-    updateUI();
-    
-    // Hide splash screen after 1.5 seconds to ensure it's visible
-    setTimeout(() => {
-        if (els.splashScreen) {
-            els.splashScreen.classList.add('hidden');
-            // Remove from DOM after transition
-            setTimeout(() => els.splashScreen.remove(), 800);
-        }
-    }, 1500);
+    try {
+        loadState();
+        setupEventListeners();
+        updateUI();
+    } catch (err) {
+        console.error("Error during init:", err);
+    } finally {
+        // Hide splash screen after 1.2 seconds to ensure smooth transition
+        setTimeout(() => {
+            if (els.splashScreen) {
+                els.splashScreen.classList.add('hidden');
+                // Remove from DOM after transition
+                setTimeout(() => els.splashScreen.remove(), 800);
+            }
+        }, 1200);
+    }
 }
 
 // Load from LocalStorage

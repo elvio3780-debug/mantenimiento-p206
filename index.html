@@ -189,6 +189,14 @@
           });
         });
       }
+      // Failsafe: remove splash screen if still visible
+      setTimeout(() => {
+        const splash = document.getElementById('splashScreen');
+        if (splash && !splash.classList.contains('hidden')) {
+          splash.classList.add('hidden');
+          setTimeout(() => splash.remove(), 800);
+        }
+      }, 2500);
     </script>
     <script src="./app.js"></script>
 </body>
