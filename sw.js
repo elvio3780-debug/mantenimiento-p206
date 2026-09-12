@@ -1,4 +1,4 @@
-const CACHE_NAME = 'p206-cache-v6';
+const CACHE_NAME = 'p206-cache-v7';
 const urlsToCache = [
   './',
   './index.html',

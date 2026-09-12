@@ -10,22 +10,7 @@ let state = {
 let showAllHistory = false;
 let pendingDeleteId = null;
 let deferredPrompt = null;
-
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    if (els.btnInstallPwa) {
-        els.btnInstallPwa.classList.remove('hidden');
-    }
-});
-
-window.addEventListener('appinstalled', () => {
-    deferredPrompt = null;
-    if (els.btnInstallPwa) {
-        els.btnInstallPwa.classList.add('hidden');
-    }
-    showToast('¡App instalada correctamente!');
-});
+let toastTimeout = null;
 
 // Config for Peugeot 206 1.4 Nafta
 const maintenanceConfig = {
@@ -63,6 +48,11 @@ const els = {
     deleteItemDescription: document.getElementById('deleteItemDescription'),
     btnCancelDelete: document.getElementById('btnCancelDelete'),
     btnConfirmDelete: document.getElementById('btnConfirmDelete'),
+
+    modalSettings: document.getElementById('modalSettings'),
+    btnExportData: document.getElementById('btnExportData'),
+    btnImportDataTrigger: document.getElementById('btnImportDataTrigger'),
+    inputImportFile: document.getElementById('inputImportFile'),
     
     toastNotification: document.getElementById('toastNotification'),
     toastMessage: document.getElementById('toastMessage'),
@@ -79,6 +69,14 @@ function parseLocalDate(dateStr) {
         return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
     }
     return new Date(dateStr);
+}
+
+function getTodayLocalDateString() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 
@@ -156,6 +154,9 @@ function updateTireStatus() {
     if (diffDays === 0) {
         els.tireStatus.textContent = "Hoy";
         els.tireStatus.style.color = "var(--success-color)";
+    } else if (diffDays === 1) {
+        els.tireStatus.textContent = "Ayer";
+        els.tireStatus.style.color = "var(--text-secondary)";
     } else if (diffDays >= (TIRE_INFLATE_INTERVAL_DAYS - TIRE_REMINDER_DAYS)) {
         els.tireStatus.textContent = `Hace ${diffDays} días (Pronto)`;
         els.tireStatus.style.color = "var(--danger-color)";
@@ -196,8 +197,12 @@ function renderHistory() {
         }
     }
     
-    // Sort by date descending
-    const sortedHistory = [...state.history].sort((a, b) => new Date(b.date) - new Date(a.date));
+    // Sort by date descending, then by km descending
+    const sortedHistory = [...state.history].sort((a, b) => {
+        const diff = new Date(b.date) - new Date(a.date);
+        if (diff !== 0) return diff;
+        return (b.km || 0) - (a.km || 0);
+    });
     const itemsToDisplay = showAllHistory ? sortedHistory : sortedHistory.slice(0, 5);
     
     itemsToDisplay.forEach(item => {
@@ -388,17 +393,21 @@ function renderAlerts() {
     
     // Check Tires
     if (state.lastTireInflate) {
-        const lastDate = new Date(state.lastTireInflate);
-        const now = new Date();
-        const diffDays = Math.floor(Math.abs(now - lastDate) / (1000 * 60 * 60 * 24));
-        
-        if (diffDays >= (TIRE_INFLATE_INTERVAL_DAYS - TIRE_REMINDER_DAYS)) {
-            alerts.push({
-                type: 'neumaticos',
-                title: 'Inflar Neumáticos',
-                msg: `Hace ${diffDays} días que no se inflan.`,
-                danger: diffDays >= TIRE_INFLATE_INTERVAL_DAYS
-            });
+        const lastDate = parseLocalDate(state.lastTireInflate);
+        if (lastDate && !isNaN(lastDate.getTime())) {
+            const now = new Date();
+            const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const startOfLast = new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate());
+            const diffDays = Math.floor(Math.abs(startOfToday - startOfLast) / (1000 * 60 * 60 * 24));
+            
+            if (diffDays >= (TIRE_INFLATE_INTERVAL_DAYS - TIRE_REMINDER_DAYS)) {
+                alerts.push({
+                    type: 'neumaticos',
+                    title: 'Inflar Neumáticos',
+                    msg: `Hace ${diffDays} días que no se inflan.`,
+                    danger: diffDays >= TIRE_INFLATE_INTERVAL_DAYS
+                });
+            }
         }
     } else {
         alerts.push({
@@ -420,7 +429,7 @@ function renderAlerts() {
             const lastRecord = typeHistory[0];
             
             // Check KM
-            if (config.km > 0) {
+            if (config.km > 0 && typeof lastRecord.km === 'number') {
                 const kmDiff = state.mileage - lastRecord.km;
                 const kmRemaining = config.km - kmDiff;
                 
@@ -428,34 +437,33 @@ function renderAlerts() {
                     alerts.push({
                         type: type,
                         title: config.name,
-                        msg: kmRemaining <= 0 ? `Servicio vencido por ${Math.abs(kmRemaining)} km` : `Faltan ${kmRemaining} km`,
+                        msg: kmRemaining <= 0 ? `Servicio vencido por ${Math.abs(kmRemaining).toLocaleString('es-AR')} km` : `Faltan ${kmRemaining.toLocaleString('es-AR')} km`,
                         danger: kmRemaining <= 0
                     });
                 }
             }
             
             // Check Months
-            if (config.months > 0) {
+            if (config.months > 0 && lastRecord.date) {
                 const lastDate = parseLocalDate(lastRecord.date);
-                const now = new Date();
-                const monthDiff = (now.getFullYear() - lastDate.getFullYear()) * 12 + (now.getMonth() - lastDate.getMonth());
-                const monthsRemaining = config.months - monthDiff;
-                
-                if (monthsRemaining <= 1) { // 1 month warning
-                    // Prevent duplicate alert if km alert already triggered
-                    if (!alerts.some(a => a.type === type)) {
-                        alerts.push({
-                            type: type,
-                            title: config.name,
-                            msg: monthsRemaining <= 0 ? `Servicio vencido por tiempo` : `Vence el próximo mes`,
-                            danger: monthsRemaining <= 0
-                        });
+                if (lastDate && !isNaN(lastDate.getTime())) {
+                    const now = new Date();
+                    const monthDiff = (now.getFullYear() - lastDate.getFullYear()) * 12 + (now.getMonth() - lastDate.getMonth());
+                    const monthsRemaining = config.months - monthDiff;
+                    
+                    if (monthsRemaining <= 1) { // 1 month warning
+                        // Prevent duplicate alert if km alert already triggered
+                        if (!alerts.some(a => a.type === type)) {
+                            alerts.push({
+                                type: type,
+                                title: config.name,
+                                msg: monthsRemaining <= 0 ? `Servicio vencido por tiempo` : `Vence el próximo mes`,
+                                danger: monthsRemaining <= 0
+                            });
+                        }
                     }
                 }
             }
-            
-        } else {
-            // No history, maybe suggest? (Optional, let's keep it clean for now)
         }
     });
 
@@ -518,7 +526,7 @@ function setupEventListeners() {
     // Inflate Tires
     els.btnInflateTires.addEventListener('click', () => {
         // Quick Action: log today as inflate date
-        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        const today = getTodayLocalDateString();
         state.lastTireInflate = today;
         saveState();
         updateUI();
@@ -532,7 +540,7 @@ function setupEventListeners() {
         if (els.btnSubmitMaintenance) els.btnSubmitMaintenance.textContent = "Guardar Registro";
         if (els.editMaintenanceId) els.editMaintenanceId.value = '';
 
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayLocalDateString();
         document.getElementById('inputDate').value = today;
         document.getElementById('inputKm').value = state.mileage;
         document.getElementById('inputType').value = 'aceite';
@@ -548,6 +556,11 @@ function setupEventListeners() {
         const km = parseInt(document.getElementById('inputKm').value);
         const notes = document.getElementById('inputNotes').value.trim();
         const editId = els.editMaintenanceId ? els.editMaintenanceId.value : '';
+
+        if (isNaN(km) || km < 0) {
+            showToast('Por favor ingresa un kilometraje válido');
+            return;
+        }
 
         if (editId) {
             // Edit existing record
@@ -629,13 +642,27 @@ function setupEventListeners() {
         });
     }
 
-    // PWA Install
+    // PWA Install Listeners
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        if (els.btnInstallPwa) {
+            els.btnInstallPwa.classList.remove('hidden');
+        }
+    });
+
+    window.addEventListener('appinstalled', () => {
+        deferredPrompt = null;
+        if (els.btnInstallPwa) {
+            els.btnInstallPwa.classList.add('hidden');
+        }
+        showToast('¡App instalada correctamente!');
+    });
+
     if (els.btnInstallPwa) {
         els.btnInstallPwa.addEventListener('click', async () => {
             if (deferredPrompt) {
-                // Show the install prompt
                 deferredPrompt.prompt();
-                // Wait for the user to respond to the prompt
                 const { outcome } = await deferredPrompt.userChoice;
                 if (outcome === 'accepted') {
                     els.btnInstallPwa.classList.add('hidden');
@@ -645,21 +672,79 @@ function setupEventListeners() {
         });
     }
 
-    // Settings info
+    // Settings Modal
     if (els.btnSettings) {
         els.btnSettings.addEventListener('click', () => {
-            showToast('Peugeot 206 1.4 Nafta (2012) · v1.2');
+            if (els.modalSettings) {
+                els.modalSettings.classList.remove('hidden');
+            }
+        });
+    }
+
+    // Backup: Export Data
+    if (els.btnExportData) {
+        els.btnExportData.addEventListener('click', () => {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `mantenimiento-p206-${getTodayLocalDateString()}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showToast('Copia de respaldo exportada');
+        });
+    }
+
+    // Backup: Import Data
+    if (els.btnImportDataTrigger && els.inputImportFile) {
+        els.btnImportDataTrigger.addEventListener('click', () => {
+            els.inputImportFile.click();
+        });
+
+        els.inputImportFile.addEventListener('change', (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                try {
+                    const imported = JSON.parse(evt.target.result);
+                    if (typeof imported.mileage === 'number' && Array.isArray(imported.history)) {
+                        state = {
+                            mileage: imported.mileage || 0,
+                            lastTireInflate: imported.lastTireInflate || null,
+                            history: imported.history || []
+                        };
+                        saveState();
+                        updateUI();
+                        if (els.modalSettings) els.modalSettings.classList.add('hidden');
+                        showToast('Datos restaurados correctamente');
+                    } else {
+                        showToast('El archivo no tiene el formato correcto');
+                    }
+                } catch (err) {
+                    console.error("Error al importar datos:", err);
+                    showToast('Error al leer el archivo de respaldo');
+                } finally {
+                    els.inputImportFile.value = '';
+                }
+            };
+            reader.readAsText(file);
         });
     }
 }
 
 function showToast(msg) {
+    if (toastTimeout) {
+        clearTimeout(toastTimeout);
+    }
     els.toastMessage.textContent = msg;
     els.toastNotification.classList.remove('hidden');
     
     // Hide after 3 seconds
-    setTimeout(() => {
+    toastTimeout = setTimeout(() => {
         els.toastNotification.classList.add('hidden');
+        toastTimeout = null;
     }, 3000);
 }
 

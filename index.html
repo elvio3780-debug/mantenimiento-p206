@@ -172,6 +172,31 @@
                 </div>
             </div>
         </div>
+
+        <!-- Settings Modal -->
+        <div id="modalSettings" class="modal-overlay hidden">
+            <div class="modal-content glass-card">
+                <div class="modal-header">
+                    <h2>Configuración y Datos</h2>
+                    <button type="button" class="close-modal icon-btn" title="Cerrar" aria-label="Cerrar"><i class="ph ph-x"></i></button>
+                </div>
+                <div class="settings-body">
+                    <div class="car-spec">
+                        <h3>Peugeot 206 1.4 Nafta (75cv)</h3>
+                        <p class="subtitle">Modelo 2012 · Motor TU3JP</p>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="button" id="btnExportData" class="btn-secondary settings-btn">
+                            <i class="ph ph-download-simple"></i> Exportar Copia de Respaldo
+                        </button>
+                        <button type="button" id="btnImportDataTrigger" class="btn-secondary settings-btn">
+                            <i class="ph ph-upload-simple"></i> Restaurar Copia de Respaldo
+                        </button>
+                        <input type="file" id="inputImportFile" accept=".json" style="display: none;">
+                    </div>
+                </div>
+            </div>
+        </div>
         
         <!-- Alert Notification -->
         <div id="toastNotification" class="toast hidden">
